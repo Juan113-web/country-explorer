@@ -25,8 +25,9 @@
   <div id="card"></div>
 
   <script>
-    // API endpoint to search countries by name
-    const API = "https://restcountries.com/v3.1/name/";
+    // REST Countries v5 (the old v3.1 API was shut down and now needs a free API key)
+    const API = "https://api.restcountries.com/countries/v5/names.common";
+    const API_KEY = "rc_live_30f0cdb3969649e5abad34db445502a1";
 
     const form = document.querySelector("#search-form");
     const input = document.querySelector("#country");
@@ -44,7 +45,8 @@
     async function showCountry(name) {
       card.textContent = "Loading…";
       try {
-        const response = await fetch(API + encodeURIComponent(name));
+        const url = `${API}?q=${encodeURIComponent(name)}&limit=10&api-key=${API_KEY}`;
+        const response = await fetch(url);
 
         // fetch() does not reject on 404, so we check the status ourselves
         if (response.status === 404) {
@@ -55,15 +57,28 @@
           throw new Error("Status " + response.status);
         }
 
-        const data = await response.json();
-        const country = data[0];
+        const json = await response.json();
+        const list = json.data.objects;
+        if (!list || list.length === 0) {
+          card.textContent = "Country not found";
+          return;
+        }
+
+        // Prefer the exact name match, otherwise use the first result
+        const country =
+          list.find((c) => c.names.common.toLowerCase() === name.toLowerCase()) || list[0];
+        const capital = country.capitals && country.capitals[0] ? country.capitals[0].name : "N/A";
+        const population = country.population ? country.population.toLocaleString() : "N/A";
+        const flag =
+          (country.flag && country.flag.url_png) ||
+          `https://flags.restcountries.com/v5/w320/${country.codes.alpha_2.toLowerCase()}.png`;
 
         // Render the data in the DOM
         card.innerHTML = `
-          <h2>${country.name.common}</h2>
-          <p><strong>Capital:</strong> ${country.capital ? country.capital[0] : "N/A"}</p>
-          <p><strong>Population:</strong> ${country.population.toLocaleString()}</p>
-          <img src="${country.flags.png}" alt="Flag of ${country.name.common}">
+          <h2>${country.names.common}</h2>
+          <p><strong>Capital:</strong> ${capital}</p>
+          <p><strong>Population:</strong> ${population}</p>
+          <img src="${flag}" alt="Flag of ${country.names.common}">
         `;
       } catch (error) {
         // Network failure or unexpected error
